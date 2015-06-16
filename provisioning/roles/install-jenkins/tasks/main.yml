@@ -39,14 +39,14 @@
     - apache2
     - libapache2-mod-proxy-html
 
-- name: Enable proxy module
-  apache2_module: state=present name=proxy
+#- name: Enable proxy module
+#  apache2_module: name=proxy state=present
 
-- name: Enable proxy_http module
-  apache2_module: state=present name=proxy_http
+#- name: Enable proxy_http module
+#  apache2_module: state=present name=proxy_http
 
 - name: Push future default virtual host configuration
-  copy: src=jenkins.leftxs.org.conf dest=/etc/apache2/sites-available/ mode=0644
+  copy: src=jenkins.org.conf dest=/etc/apache2/sites-available/ mode=0644
   notify:
       - restart jenkins
 
@@ -54,7 +54,7 @@
   command: a2dissite 000-default.conf
 
 - name: Activate jenkins virtualhost
-  command: a2ensite jenkins.leftxs.org.conf
+  command: a2ensite jenkins.org.conf
   notify:
       - restart apache
 
@@ -64,7 +64,7 @@
   ignore_errors: True
 
 - name: Rolling back - Removing out virtualhost
-  command: a2dissite jenkins.leftxs.org.conf
+  command: a2dissite jenkins.org.conf
   when: result|failed
 
 - name: Rolling back - Ending playbook
