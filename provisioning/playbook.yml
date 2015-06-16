@@ -1,0 +1,13 @@
+- name: Installs Jenkins on Ubuntu 
+  hosts: all
+  user: vagrant
+  sudo: yes
+
+  roles:
+    - apt-update
+    - apt-upgrade
+    - ubuntu_packages
+    - install_jenkins
+
+  handlers:
+   - include: handlers.yml
