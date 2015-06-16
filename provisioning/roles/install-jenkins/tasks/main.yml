@@ -1,0 +1,78 @@
+---
+
+- name: Add jenkins apt key
+  apt_key: url=http://pkg.jenkins-ci.org/debian/jenkins-ci.org.key id=D50582E6
+
+- name: Add jenkins apt repo
+  apt_repository: repo='deb http://pkg.jenkins-ci.org/debian binary/' update_cache=yes
+
+- name: Install jenkins
+  apt: pkg=jenkins
+
+#- name: jenkins-install | Setup passlib
+#  apt: pkg=python-passlib
+#  when: jenkins_proxy_auth
+
+- name: Create directory for jenkins backup
+  file: path=/opt/jenkins state=directory owner=jenkins group=nogroup
+  sudo: yes
+
+- name: Install cron to backup jenkins
+  cron: state=present name="Backup Jenkins" minute=0 hour=2 job="tar zcvf /opt/jenkins/backup.tar.gz -C /opt/jenkins /var/lib/jenkins"
+
+- name: Push jenkins conf
+  copy: src=jenkins dest=/etc/default/jenkins mode=0644
+
+- name: Ensure jenkins user has ssh key
+  user: name=jenkins state=present generate_ssh_key=yes
+
+- name: Download SWARM plugin for jenkins
+  get_url: dest=/var/lib/jenkins/plugins url=http://updates.jenkins-ci.org/latest/{{ item }}.hpi owner=jenkins group=jenkins
+  with_items:
+      - swarm
+  notify:
+      - restart jenkins
+
+- name: Install Apache2 for jenkins
+  apt: name={{item}} state=present
+  with_items:
+    - apache2
+    - libapache2-mod-proxy-html
+
+- name: Enable proxy module
+  apache2_module: state=present name=proxy
+
+- name: Enable proxy_http module
+  apache2_module: state=present name=proxy_http
+
+- name: Push future default virtual host configuration
+  copy: src=jenkins.leftxs.org.conf dest=/etc/apache2/sites-available/ mode=0644
+  notify:
+      - restart jenkins
+
+- name: Deactivates the default virtualhost
+  command: a2dissite 000-default.conf
+
+- name: Activate jenkins virtualhost
+  command: a2ensite jenkins.leftxs.org.conf
+  notify:
+      - restart apache
+
+- name: Check that our config is valid
+  command: apache2ctl configtest
+  register: result
+  ignore_errors: True
+
+- name: Rolling back - Removing out virtualhost
+  command: a2dissite jenkins.leftxs.org.conf
+  when: result|failed
+
+- name: Rolling back - Ending playbook
+  fail: msg="Configuration file is not valid. Please check that before re-running the playbook."
+  when: result|failed
+
+#- name: Deactivates the default ssl virtualhost
+#  command: a2dissite default-ssl
+
+#  notify: restart apache
+#  notify: restart jenkins
